@@ -34,6 +34,10 @@ SCOPES = [
 # How many recent inbox emails to process per run.
 MAX_RESULTS = 200
 
+# Emails sent to Claude in a single API call. Keeping this small prevents
+# Haiku from dropping results in large batches.
+BATCH_SIZE = 20
+
 # Gmail's ACTUAL built-in category tabs (these are the only valid ones --
 # "Purchases" and "Bills" are not real Gmail category IDs, despite showing
 # up as sub-groupings in the Gmail UI sometimes).
@@ -296,9 +300,12 @@ def main():
             "current_label_ids": current_label_ids,
         })
 
-    # Phase 2: classify all of them in a single batched API call.
-    print(f"Classifying {len(email_data)} emails in one batch call...\n")
-    classifications = classify_emails_batch(email_data)
+    # Phase 2: classify in chunks to avoid Haiku dropping results in large batches.
+    chunks = [email_data[i:i + BATCH_SIZE] for i in range(0, len(email_data), BATCH_SIZE)]
+    print(f"Classifying {len(email_data)} emails in {len(chunks)} batch(es) of up to {BATCH_SIZE}...\n")
+    classifications = []
+    for chunk in chunks:
+        classifications.extend(classify_emails_batch(chunk))
 
     # Phase 3: apply labels for each email based on its classification.
     for email, result in zip(email_data, classifications):
