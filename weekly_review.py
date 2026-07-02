@@ -76,6 +76,37 @@ def get_credentials():
     return creds
 
 
+def fetch_current_filters(service, id_to_name):
+    """Return all Gmail filters as a list of human-readable dicts."""
+    result = service.users().settings().filters().list(userId="me").execute()
+    filters = []
+    for f in result.get("filter", []):
+        criteria = f.get("criteria", {})
+        action = f.get("action", {})
+
+        parts = []
+        if criteria.get("from"):
+            parts.append(f"from:{criteria['from']}")
+        if criteria.get("to"):
+            parts.append(f"to:{criteria['to']}")
+        if criteria.get("subject"):
+            parts.append(f"subject:{criteria['subject']}")
+        if criteria.get("query"):
+            parts.append(criteria["query"])
+        query_str = " ".join(parts) if parts else "(no criteria)"
+
+        add_labels = [id_to_name.get(lid, lid) for lid in action.get("addLabelIds", [])]
+        remove_labels = [id_to_name.get(lid, lid) for lid in action.get("removeLabelIds", [])]
+        action_parts = [f"+{n}" for n in add_labels] + [f"-{n}" for n in remove_labels]
+
+        filters.append({
+            "id": f["id"],
+            "query": query_str,
+            "action": " ".join(action_parts) if action_parts else "(no action)",
+        })
+    return filters
+
+
 def fetch_emails_for_review(service):
     """Pull emails that have any user label in the last 30 days, plus anything
     currently sitting in Needs Review, regardless of age. Each email comes
@@ -136,10 +167,10 @@ def fetch_emails_for_review(service):
             "current_labels": applied_label_names,
         })
 
-    return emails, review_ids
+    return emails, review_ids, id_to_name
 
 
-def build_review_prompt(emails, needs_review_count):
+def build_review_prompt(emails, needs_review_count, current_filters):
     existing_labels_list = "\n".join(f"- {name}" for name in EXISTING_CUSTOM_LABELS)
 
     emails_block = "\n".join(
@@ -148,36 +179,39 @@ def build_review_prompt(emails, needs_review_count):
         for e in emails
     )
 
+    if current_filters:
+        filters_block = "\n".join(
+            f"- [{f['id']}] {f['query']} {f['action']}"
+            for f in current_filters
+        )
+    else:
+        filters_block = "(no filters set)"
+
     return f"""You are reviewing a month's worth of sorted emails for a Gmail
 inbox-filtering system, to suggest improvements to the label scheme.
 
 EXISTING CUSTOM LABELS:
 {existing_labels_list}
 
+CURRENT GMAIL FILTERS (query -> action, with filter ID in brackets):
+{filters_block}
+
 This month's emails ({len(emails)} total, including {needs_review_count}
 currently in "Needs Review"), with where each one currently landed:
 {emails_block}
 
-You have two separate jobs. Read both carefully -- they look for different
-things.
+You have four separate jobs. Read each carefully.
 
-JOB 1 -- FILTER SUGGESTIONS (high confidence, mechanical sender->label rules)
+JOB 1 -- NEW FILTER SUGGESTIONS (high confidence, mechanical sender->label rules)
 Look for senders where EVERY email from that exact sender/domain always
 gets the same label, with no judgment call needed. These are good
 candidates for a Gmail filter that bypasses the AI classifier entirely
 (cheaper and faster than asking Claude every time).
 
-Examples of the kind of pattern to look for:
-- All "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>" emails get
-  labeled Job/Board -> suggest filter: from:jobalerts-noreply@linkedin.com -> Job/Board
-- All emails from a news outlet's domain (e.g. Telegraph, BBC) get
-  labeled News -> suggest filter: from:telegraph.co.uk -> News
-- All emails from a learning platform (e.g. edX, Coursera) get labeled
-  Courses -> suggest filter: from:edx.org -> Courses
-
 Only suggest a filter if you see the SAME sender/domain appear multiple
 times with the SAME label every time. Don't suggest a filter for a sender
-you've only seen once, or where the label varies.
+you've only seen once, or where the label varies. Do NOT suggest a filter
+whose query already exists in the CURRENT GMAIL FILTERS list above.
 
 JOB 2 -- NEW LABEL / SUB-LABEL SUGGESTIONS (finding sub-patterns)
 Look in TWO places for these:
@@ -185,16 +219,13 @@ Look in TWO places for these:
     several emails inside "PM/Other" are actually all tech product
     promotions, that's a sign "PM/Tech" deserves to be its own sub-label.
 (b) Inside "Needs Review" and "Junk" -- if several emails there share an
-    obvious unaddressed theme (e.g. multiple security/login alert emails
-    from different services), that's a sign a new label like "Security
-    Alerts" would help.
+    obvious unaddressed theme, that's a sign a new label would help.
 
 Only suggest a new label if you see at least 2-3 real examples of the
 pattern in this batch -- not a single one-off email.
 
 IMPORTANT: the "label_name" field must be the exact Gmail label name to
-create -- short, clean, no parentheses, no notes (e.g. "PM/Politics" not
-"PM/Politics (new)" or "PM/Politics -- see reason"). Put any explanation
+create -- short, clean, no parentheses, no notes. Put any explanation
 in the "reason" field instead.
 
 JOB 3 -- RETROACTIVE RELABELING (moving specific backlogged emails)
@@ -209,11 +240,19 @@ match future emails of a different type from the same sender.
 Good example: from:automated@airbnb.com subject:"Security alert"
 Bad example:  from:airbnb.com  (too broad -- matches receipts, marketing, etc.)
 
-For each retroactive relabel, also list which labels should be removed
-(e.g. "Needs Review", "PM/Other") alongside the label being added.
-
 Only suggest retroactive relabels where you have concrete examples in this
 batch. If you have no examples, return an empty array.
+
+JOB 4 -- FILTER REMOVAL SUGGESTIONS (broken or overly broad existing filters)
+Review the CURRENT GMAIL FILTERS list. Suggest removing a filter if you can
+see evidence in this month's emails that it is:
+- Too broad (catching emails that clearly shouldn't get that label)
+- Incorrectly labelled (the filter's label doesn't match what it's catching)
+- Redundant (another filter already covers the same pattern)
+
+Only suggest removal if you have concrete evidence from this batch.
+Return the filter's ID exactly as shown in brackets. Return an empty array
+if no filters look problematic.
 
 Respond with ONLY valid JSON in this exact format (empty arrays if you
 genuinely have no suggestions for a job):
@@ -222,19 +261,22 @@ genuinely have no suggestions for a job):
     {{"label_name": "Job/Board", "gmail_filter_query": "from:jobalerts-noreply@linkedin.com", "reason": "Every LinkedIn job alert email this month was labeled Job/Board"}}
   ],
   "new_label_suggestions": [
-    {{"label_name": "PM/Tech", "reason": "Several tech product promo emails are landing in PM/Other -- label_name must be short and clean, no parentheses or notes", "matching_senders_or_subjects": ["example sender/subject 1", "example sender/subject 2"]}}
+    {{"label_name": "PM/Tech", "reason": "Several tech product promo emails are landing in PM/Other", "matching_senders_or_subjects": ["example sender/subject 1", "example sender/subject 2"]}}
   ],
   "retroactive_relabels": [
     {{"query": "from:automated@airbnb.com subject:Security alert", "add_label": "Security/Alerts", "remove_labels": ["Needs Review"], "reason": "3 Airbnb security alert emails are sitting in Needs Review"}}
+  ],
+  "filter_removal_suggestions": [
+    {{"filter_id": "ANe1BmjXyz", "filter_query": "from:example.com", "current_label": "Job/Board", "reason": "Catching unrelated marketing emails from example.com"}}
   ]
 }}"""
 
 
-def get_review_suggestions(emails, needs_review_count):
+def get_review_suggestions(emails, needs_review_count, current_filters):
     if not emails:
-        return {"new_label_suggestions": [], "filter_suggestions": [], "retroactive_relabels": []}
+        return {"new_label_suggestions": [], "filter_suggestions": [], "retroactive_relabels": [], "filter_removal_suggestions": []}
 
-    prompt = build_review_prompt(emails, needs_review_count)
+    prompt = build_review_prompt(emails, needs_review_count, current_filters)
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
@@ -265,6 +307,9 @@ def assign_indices(raw_suggestions):
     for s in raw_suggestions.get("retroactive_relabels", []):
         indexed.append({"index": idx, "type": "retroactive", **s})
         idx += 1
+    for s in raw_suggestions.get("filter_removal_suggestions", []):
+        indexed.append({"index": idx, "type": "filter_removal", **s})
+        idx += 1
     return indexed
 
 
@@ -274,6 +319,7 @@ def format_summary_email(suggestions, total_emails, needs_review_count):
     label_items = [s for s in indexed if s["type"] == "label"]
     filter_items = [s for s in indexed if s["type"] == "filter"]
     retro_items = [s for s in indexed if s["type"] == "retroactive"]
+    removal_items = [s for s in indexed if s["type"] == "filter_removal"]
 
     lines = [
         f"Weekly inbox review -- {datetime.now().strftime('%Y-%m-%d')}",
@@ -322,6 +368,18 @@ def format_summary_email(suggestions, total_emails, needs_review_count):
 
     lines.append("")
 
+    if removal_items:
+        lines.append("--- Suggested filter removals ---")
+        for s in removal_items:
+            lines.append(
+                f"\n[{s['index']}] REMOVE: {s.get('filter_query', '')} -> {s.get('current_label', '')}"
+            )
+            lines.append(f"    Reason: {s.get('reason', '')}")
+    else:
+        lines.append("No filter removal suggestions this week.")
+
+    lines.append("")
+
     if indexed:
         lines.append(
             'Reply to this email with the suggestion numbers you want applied '
@@ -360,14 +418,18 @@ def main():
     service = build("gmail", "v1", credentials=creds)
 
     print("Fetching this month's emails for review...")
-    emails, review_ids = fetch_emails_for_review(service)
+    emails, review_ids, id_to_name = fetch_emails_for_review(service)
 
     if not emails:
         print("No emails to review this month.")
         return
 
+    print("Fetching current Gmail filters...")
+    current_filters = fetch_current_filters(service, id_to_name)
+    print(f"Found {len(current_filters)} existing filter(s).")
+
     print(f"Reviewing {len(emails)} emails ({len(review_ids)} in Needs Review)...")
-    suggestions = get_review_suggestions(emails, len(review_ids))
+    suggestions = get_review_suggestions(emails, len(review_ids), current_filters)
 
     summary = format_summary_email(suggestions, len(emails), len(review_ids))
     print("\n" + summary + "\n")

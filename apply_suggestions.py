@@ -317,6 +317,20 @@ def apply_retroactive_relabel(service, label_cache, suggestion):
     return True
 
 
+def remove_filter(service, suggestion):
+    filter_id = suggestion.get("filter_id")
+    if not filter_id:
+        print(f"  [SKIP] Filter removal missing filter_id")
+        return False
+    try:
+        service.users().settings().filters().delete(userId="me", id=filter_id).execute()
+        print(f"  [OK] Deleted filter: {suggestion.get('filter_query', filter_id)}")
+        return True
+    except HttpError as error:
+        print(f"  [FAILED] Delete filter {filter_id}: {error}")
+        return False
+
+
 def mark_as_applied(service, label_cache, message_id):
     applied_id = get_or_create_label_id(service, label_cache, APPLIED_LABEL)
     if applied_id:
@@ -421,6 +435,9 @@ def main():
             ok = apply_retroactive_relabel(service, label_cache, s)
             desc = f"Retroactive: {s['query']} -> {s['add_label']}"
             (applied if ok else not_found).append(desc)
+        elif stype == "filter_removal":
+            if remove_filter(service, s):
+                applied.append(f"Removed filter: {s.get('filter_query', s.get('filter_id', '?'))}")
 
     mark_as_applied(service, label_cache, review_id)
 
