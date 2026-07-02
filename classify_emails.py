@@ -52,14 +52,14 @@ with open("labels.json") as _f:
 
 FALLBACK_LABEL = "Needs Review"
 
-# Marker label applied to every email once it's been processed, so future
-# runs skip it instead of reclassifying the same emails repeatedly.
-PROCESSED_LABEL = "HBF"
+# Parent labels derived from sub-labels (e.g. "PM" from "PM/Fashion").
+# Applied automatically alongside any sub-label so emails appear under both.
+_PARENT_LABELS = sorted({name.split("/")[0] for name in CUSTOM_LABELS if "/" in name})
 
-# Labels that are safe to strip and reapply each run. Deliberately excludes
-# system/state labels (INBOX, UNREAD, SPAM, TRASH, HBF) since removing those
-# would change something other than classification (e.g. archiving).
-REMOVABLE_LABEL_NAMES = list(CUSTOM_LABELS.keys()) + [FALLBACK_LABEL]
+# Labels that are safe to strip and reapply each run. Excludes system/state
+# labels (INBOX, UNREAD, SPAM, TRASH) since removing those would do more than
+# change classification (e.g. archiving).
+REMOVABLE_LABEL_NAMES = list(CUSTOM_LABELS.keys()) + _PARENT_LABELS + [FALLBACK_LABEL]
 
 client = anthropic.Anthropic()
 
@@ -253,7 +253,7 @@ def main():
         .list(
             userId="me",
             labelIds=["INBOX"],
-            q=f"-label:{PROCESSED_LABEL} after:{date_cutoff}",
+            q=f"has:nouserlabels after:{date_cutoff}",
             maxResults=MAX_RESULTS,
         )
         .execute()
@@ -325,11 +325,12 @@ def main():
             label_id = get_or_create_label_id(service, label_cache, label_name)
             if label_id:
                 label_ids_to_add.append(label_id)
-
-        # Always tag with HBF so this email is skipped on future runs.
-        hbf_id = get_or_create_label_id(service, label_cache, PROCESSED_LABEL)
-        if hbf_id:
-            label_ids_to_add.append(hbf_id)
+            # Also apply the parent label for any sub-label (e.g. PM/Fashion → PM).
+            if "/" in label_name:
+                parent = label_name.split("/")[0]
+                parent_id = get_or_create_label_id(service, label_cache, parent)
+                if parent_id:
+                    label_ids_to_add.append(parent_id)
 
         # Don't remove a label we're about to re-add in the same call.
         label_ids_to_remove = [

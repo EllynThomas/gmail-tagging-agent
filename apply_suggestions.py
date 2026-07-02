@@ -259,24 +259,19 @@ def apply_filter(service, label_cache, suggestion):
         print(f"  [SKIP] Filter {query} -> {label_name} (label resolution failed)")
         return False
 
-    hbf_id = get_or_create_label_id(service, label_cache, "HBF")
-    ok = True
-    for target_id, target_name in [(label_id, label_name), (hbf_id, "HBF")]:
-        if not target_id:
-            continue
-        try:
-            service.users().settings().filters().create(
-                userId="me",
-                body={
-                    "criteria": {"query": query},
-                    "action": {"addLabelIds": [target_id]},
-                },
-            ).execute()
-            print(f"  [OK] Filter: {query} -> {target_name}")
-        except HttpError as error:
-            print(f"  [FAILED] Filter: {query} -> {target_name}: {error}")
-            ok = False
-    return ok
+    try:
+        service.users().settings().filters().create(
+            userId="me",
+            body={
+                "criteria": {"query": query},
+                "action": {"addLabelIds": [label_id]},
+            },
+        ).execute()
+        print(f"  [OK] Filter: {query} -> {label_name}")
+        return True
+    except HttpError as error:
+        print(f"  [FAILED] Filter: {query} -> {label_name}: {error}")
+        return False
 
 
 def apply_retroactive_relabel(service, label_cache, suggestion):
