@@ -41,7 +41,6 @@ SCOPES = [
 # reasonably high since it's only running once a week.
 MAX_RESULTS = 200
 
-PROCESSED_LABEL = "HBF"
 NEEDS_REVIEW_LABEL = "Needs Review"
 
 # Your current label scheme, kept here too so the review prompt has full
@@ -78,7 +77,7 @@ def get_credentials():
 
 
 def fetch_emails_for_review(service):
-    """Pull emails labeled in the last 30 days (HBF) plus anything
+    """Pull emails that have any user label in the last 30 days, plus anything
     currently sitting in Needs Review, regardless of age. Each email comes
     back with the human-readable names of its currently applied labels,
     so the review prompt can see exactly where things landed."""
@@ -89,8 +88,8 @@ def fetch_emails_for_review(service):
     label_list = service.users().labels().list(userId="me").execute()
     id_to_name = {l["id"]: l["name"] for l in label_list.get("labels", [])}
 
-    # Recently processed emails (any outcome).
-    recent_query = f"label:{PROCESSED_LABEL} after:{date_cutoff}"
+    # Recently classified emails -- any email that has at least one user label.
+    recent_query = f"has:userlabels after:{date_cutoff}"
     recent_results = (
         service.users()
         .messages()
@@ -126,7 +125,7 @@ def fetch_emails_for_review(service):
         applied_label_ids = msg.get("labelIds", [])
         applied_label_names = [
             id_to_name.get(lid, lid) for lid in applied_label_ids
-            if id_to_name.get(lid, lid) not in ("INBOX", "UNREAD", PROCESSED_LABEL)
+            if id_to_name.get(lid, lid) not in ("INBOX", "UNREAD")
             and not id_to_name.get(lid, lid).startswith("CATEGORY_")
         ] or ["(none)"]
 
