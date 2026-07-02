@@ -65,6 +65,33 @@ All checks should pass before running the main scripts.
 
 ---
 
+## Configuration
+
+The main tuneable values are at the top of each script — no need to dig into the logic to change them.
+
+**`classify_emails.py`**
+
+| Constant | Default | What it controls |
+|---|---|---|
+| `MAX_RESULTS` | `200` | Max emails classified per run. Increase if you get a lot of mail; decrease to reduce API cost. |
+| `timedelta(days=2)` | `2` | How far back to look for unlabelled emails. Increase if you run the script less frequently than daily. |
+
+**`weekly_review.py`**
+
+| Constant | Default | What it controls |
+|---|---|---|
+| `MAX_RESULTS` | `200` | Max emails pulled in for the weekly review prompt. |
+| `timedelta(days=30)` | `30` | How far back the review looks when fetching labelled emails for analysis. |
+
+**`apply_suggestions.py`**
+
+| Constant | Default | What it controls |
+|---|---|---|
+| `REVIEW_SUBJECT_PREFIX` | `"Weekly inbox review --"` | The subject prefix used to find your review emails. Change if you edit `weekly_review.py`'s subject line. |
+| `APPLIED_LABEL` | `"Review/Applied"` | Gmail label added to review emails once suggestions are applied, to prevent double-processing. |
+
+---
+
 ## Customising your labels
 
 The label scheme lives in `labels.default.json` (committed, generic defaults). To personalise:
