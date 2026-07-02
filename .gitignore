@@ -1,0 +1,15 @@
+# OAuth credentials and tokens -- never commit these
+credentials.json
+token.json
+
+# SSH private key -- never commit this
+*.pem
+
+# Python virtualenv
+.venv/
+
+# Tests
+tests/
+
+# Logs
+*.log
