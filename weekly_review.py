@@ -46,13 +46,10 @@ NEEDS_REVIEW_LABEL = "Needs Review"
 
 # Your current label scheme, kept here too so the review prompt has full
 # context on what already exists (avoids suggesting near-duplicates).
-EXISTING_CUSTOM_LABELS = [
-    "Job/Board", "Job/Replies", "Job/Sent Applications", "Job/Alerts",
-    "Notes", "Payslips", "Receipts", "Receipts/Lime", "Receipts/Travel",
-    "Tickets", "Uni", "PM/Fashion", "PM/Travel", "PM/Events", "PM/Other",
-    "PM/Newsletters", "PM/Gaming", "Dracula", "Junk", "News", "Courses",
-    "Security/Alerts", "Subscriptions", "Needs Review",
-]
+# Loaded from labels.json -- "Needs Review" appended as it's the fallback,
+# not a label defined in that file.
+with open("labels.json") as _f:
+    EXISTING_CUSTOM_LABELS = list(json.load(_f).keys()) + ["Needs Review"]
 
 client = anthropic.Anthropic()
 

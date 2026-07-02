@@ -45,33 +45,10 @@ CATEGORY_LABELS = [
     "CATEGORY_PROMOTIONS",
 ]
 
-# Your custom labels and what belongs in each. Edit these descriptions
-# any time you notice the classifier getting something wrong.
-CUSTOM_LABELS = {
-    "Job/Board": "Job alerts or job listings, e.g. from LinkedIn, Indeed, job boards.",
-    "Job/Replies": "Responses from a recruiter or employer about an application you submitted.",
-    "Job/Sent Applications": "Confirmation copies of job applications you personally sent out.",
-    "Notes": "Casual messages from the user themself or a friend, usually with no real subject line.",
-    "Payslips": "The user's own salary slips/payslips from their employer.",
-    "Receipts": "Purchase confirmations, invoices, order receipts in general.",
-    "Receipts/Lime": "Receipts specifically from Lime (e.g. Lime scooter/bike rides).",
-    "Tickets": "Travel tickets (flights, trains) or event tickets.",
-    "Uni": "University-related emails (courses, admin, professors, deadlines).",
-    "PM/Fashion": "Marketing emails from clothing, shoe, or fashion brands/retailers.",
-    "PM/Travel": "Marketing emails about flights, hotels, travel deals.",
-    "PM/Events": "Marketing emails about events, concerts, gigs, things happening on a date.",
-    "PM/Other": "Marketing/promotional emails that don't fit Fashion, Travel, or Events.",
-    "Dracula": "Emails from a serialized email subscription that sends chapters of Dracula.",
-    "Junk": "Spam-adjacent or low-value unwanted email that Gmail's own Spam filter didn't catch.",
-    "News": "News articles or newsletters from news outlets/journalists (e.g. BBC), not general notifications.",
-    "Courses": "Online courses or learning platforms (e.g. Coursera, Udemy) -- NOT university-related (that's Uni).",
-    "Security/Alerts": "Security, login, or identity-verification alerts from services (e.g. 'new sign-in', verification codes, account activity notices).",
-    "PM/Newsletters": "Non-promotional newsletter content from causes, organisations, interest groups, or publications -- not trying to sell anything, so distinct from other PM/* labels.",
-    "PM/Gaming": "Promotional or update emails related to games, puzzles, or gaming platforms/communities (e.g. Patreon posts from puzzle creators, game studio newsletters).",
-    "Receipts/Travel": "Receipts specifically for travel-related purchases (flights, accommodation, travel bookings) -- a more specific version of Receipts.",
-    "Job/Alerts": "Recruiter or job-platform outreach emails curating/recommending specific roles to you -- distinct from Job/Board, which is raw job listing digests.",
-    "Subscriptions": "Newsletter or service emails from things you're subscribed to that aren't security-sensitive and don't need active review (e.g. Substack newsletters, platform notifications, trip reminders).",
-}
+# Custom labels loaded from labels.json -- edit that file to add, remove, or
+# tweak labels without touching this script.
+with open("labels.json") as _f:
+    CUSTOM_LABELS = json.load(_f)
 
 FALLBACK_LABEL = "Needs Review"
 

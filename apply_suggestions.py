@@ -221,49 +221,19 @@ def _make_classifier_description(label_name, reason, examples):
     return response.content[0].text.strip().strip('"')
 
 
-def _update_custom_labels(label_name, description):
-    """Insert a new entry into CUSTOM_LABELS in classify_emails.py."""
-    path = os.path.join(SCRIPT_DIR, "classify_emails.py")
+def _update_labels_file(label_name, description):
+    """Add a new label+description to labels.json."""
+    path = os.path.join(SCRIPT_DIR, "labels.json")
     with open(path) as f:
-        content = f.read()
-
-    if f'"{label_name}":' in content:
-        print(f"    [SKIP] '{label_name}' already in classify_emails.py CUSTOM_LABELS")
+        labels = json.load(f)
+    if label_name in labels:
+        print(f"    [SKIP] '{label_name}' already in labels.json")
         return
-
-    safe_desc = description.replace("\\", "\\\\").replace('"', '\\"')
-    marker = "\n}\n\nFALLBACK_LABEL"
-    idx = content.find(marker)
-    if idx == -1:
-        print(f"    [!] Could not find CUSTOM_LABELS closing brace in classify_emails.py")
-        return
-
-    new_line = f'\n    "{label_name}": "{safe_desc}",'
+    labels[label_name] = description
     with open(path, "w") as f:
-        f.write(content[:idx] + new_line + content[idx:])
-    print(f"    [OK] Added '{label_name}' to classify_emails.py")
-
-
-def _update_existing_labels(label_name):
-    """Append a label to EXISTING_CUSTOM_LABELS in weekly_review.py."""
-    path = os.path.join(SCRIPT_DIR, "weekly_review.py")
-    with open(path) as f:
-        content = f.read()
-
-    if f'"{label_name}"' in content:
-        print(f"    [SKIP] '{label_name}' already in weekly_review.py EXISTING_CUSTOM_LABELS")
-        return
-
-    marker = "\n]\n\nclient"
-    idx = content.find(marker)
-    if idx == -1:
-        print(f"    [!] Could not find EXISTING_CUSTOM_LABELS closing bracket in weekly_review.py")
-        return
-
-    new_entry = f'\n    "{label_name}",'
-    with open(path, "w") as f:
-        f.write(content[:idx] + new_entry + content[idx:])
-    print(f"    [OK] Added '{label_name}' to weekly_review.py")
+        json.dump(labels, f, indent=2)
+        f.write("\n")
+    print(f"    [OK] Added '{label_name}' to labels.json")
 
 
 def apply_label(service, label_cache, suggestion):
@@ -277,8 +247,7 @@ def apply_label(service, label_cache, suggestion):
             suggestion.get("reason", ""),
             suggestion.get("matching_senders_or_subjects", []),
         )
-        _update_custom_labels(label_name, description)
-        _update_existing_labels(label_name)
+        _update_labels_file(label_name, description)
     return ok
 
 
