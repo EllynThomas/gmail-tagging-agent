@@ -32,7 +32,7 @@ SCOPES = [
 ]
 
 # How many recent inbox emails to process per run.
-MAX_RESULTS = 20
+MAX_RESULTS = 200
 
 # Gmail's ACTUAL built-in category tabs (these are the only valid ones --
 # "Purchases" and "Bills" are not real Gmail category IDs, despite showing
@@ -244,10 +244,9 @@ def main():
     creds = get_credentials()
     service = build("gmail", "v1", credentials=creds)
 
-    # Never touch emails older than this -- keeps the script from reaching
-    # into old backlog you may have already handled manually.
-    one_month_ago = datetime.now() - timedelta(days=30)
-    date_cutoff = one_month_ago.strftime("%Y/%m/%d")
+    # Only process emails from the last 2 days to avoid touching old backlog.
+    two_days_ago = datetime.now() - timedelta(days=2)
+    date_cutoff = two_days_ago.strftime("%Y/%m/%d")
 
     results = (
         service.users()
