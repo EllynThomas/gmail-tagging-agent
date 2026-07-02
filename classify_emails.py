@@ -45,11 +45,13 @@ CATEGORY_LABELS = [
     "CATEGORY_PROMOTIONS",
 ]
 
-# Custom labels: use personal labels.json if present, otherwise fall back to
-# the committed defaults. Edit labels.json locally to customise without
-# touching labels.default.json.
-_labels_file = "labels.json" if os.path.exists("labels.json") else "labels.default.json"
-with open(_labels_file) as _f:
+# On first run, seed labels.json from the defaults so future label approvals
+# accumulate in a personal copy rather than modifying the committed default.
+if not os.path.exists("labels.json"):
+    import shutil
+    shutil.copy2("labels.default.json", "labels.json")
+
+with open("labels.json") as _f:
     CUSTOM_LABELS = json.load(_f)
 
 FALLBACK_LABEL = "Needs Review"

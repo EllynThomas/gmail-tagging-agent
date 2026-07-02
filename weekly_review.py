@@ -45,9 +45,13 @@ NEEDS_REVIEW_LABEL = "Needs Review"
 
 # Your current label scheme, kept here too so the review prompt has full
 # context on what already exists (avoids suggesting near-duplicates).
-# Uses personal labels.json if present, otherwise falls back to defaults.
-_labels_file = "labels.json" if os.path.exists("labels.json") else "labels.default.json"
-with open(_labels_file) as _f:
+# On first run, seed labels.json from the defaults so future label approvals
+# accumulate in a personal copy rather than modifying the committed default.
+if not os.path.exists("labels.json"):
+    import shutil
+    shutil.copy2("labels.default.json", "labels.json")
+
+with open("labels.json") as _f:
     EXISTING_CUSTOM_LABELS = list(json.load(_f).keys()) + ["Needs Review"]
 
 client = anthropic.Anthropic()
