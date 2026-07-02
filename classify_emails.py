@@ -45,9 +45,11 @@ CATEGORY_LABELS = [
     "CATEGORY_PROMOTIONS",
 ]
 
-# Custom labels loaded from labels.json -- edit that file to add, remove, or
-# tweak labels without touching this script.
-with open("labels.json") as _f:
+# Custom labels: use personal labels.json if present, otherwise fall back to
+# the committed defaults. Edit labels.json locally to customise without
+# touching labels.default.json.
+_labels_file = "labels.json" if os.path.exists("labels.json") else "labels.default.json"
+with open(_labels_file) as _f:
     CUSTOM_LABELS = json.load(_f)
 
 FALLBACK_LABEL = "Needs Review"

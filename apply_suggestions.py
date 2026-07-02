@@ -222,15 +222,16 @@ def _make_classifier_description(label_name, reason, examples):
 
 
 def _update_labels_file(label_name, description):
-    """Add a new label+description to labels.json."""
-    path = os.path.join(SCRIPT_DIR, "labels.json")
-    with open(path) as f:
+    """Add a new label+description to labels.json (creating it from the default if needed)."""
+    dest = os.path.join(SCRIPT_DIR, "labels.json")
+    src = dest if os.path.exists(dest) else os.path.join(SCRIPT_DIR, "labels.default.json")
+    with open(src) as f:
         labels = json.load(f)
     if label_name in labels:
         print(f"    [SKIP] '{label_name}' already in labels.json")
         return
     labels[label_name] = description
-    with open(path, "w") as f:
+    with open(dest, "w") as f:
         json.dump(labels, f, indent=2)
         f.write("\n")
     print(f"    [OK] Added '{label_name}' to labels.json")

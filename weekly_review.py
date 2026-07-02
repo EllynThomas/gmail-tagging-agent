@@ -46,9 +46,9 @@ NEEDS_REVIEW_LABEL = "Needs Review"
 
 # Your current label scheme, kept here too so the review prompt has full
 # context on what already exists (avoids suggesting near-duplicates).
-# Loaded from labels.json -- "Needs Review" appended as it's the fallback,
-# not a label defined in that file.
-with open("labels.json") as _f:
+# Uses personal labels.json if present, otherwise falls back to defaults.
+_labels_file = "labels.json" if os.path.exists("labels.json") else "labels.default.json"
+with open(_labels_file) as _f:
     EXISTING_CUSTOM_LABELS = list(json.load(_f).keys()) + ["Needs Review"]
 
 client = anthropic.Anthropic()

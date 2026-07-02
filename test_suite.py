@@ -30,17 +30,18 @@ def main():
 
     print("\n=== gmail-tagging-agent setup check ===\n")
 
-    # --- labels.json ---
-    print("[ labels.json ]")
+    # --- labels file ---
+    labels_file = "labels.json" if os.path.exists("labels.json") else "labels.default.json"
+    print(f"[ {labels_file} ]")
 
     def load_labels():
-        with open("labels.json") as f:
+        with open(labels_file) as f:
             labels = json.load(f)
         assert isinstance(labels, dict) and len(labels) > 0
         return f"{len(labels)} labels"
 
     def check_label_names():
-        with open("labels.json") as f:
+        with open(labels_file) as f:
             labels = json.load(f)
         bad = [n for n in labels if "(" in n]
         assert not bad, f"Labels with parentheses in name: {bad}"
@@ -92,7 +93,7 @@ def main():
         service = build("gmail", "v1", credentials=creds)
         result = service.users().labels().list(userId="me").execute()
         gmail_names = {l["name"].lower() for l in result["labels"]}
-        with open("labels.json") as f:
+        with open(labels_file) as f:
             local_labels = json.load(f)
         missing = [n for n in local_labels if n.lower() not in gmail_names]
         if missing:

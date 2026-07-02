@@ -1,0 +1,15 @@
+{
+  "Receipts": "Purchase confirmations, invoices, and order receipts.",
+  "Finance": "Financial emails in general -- see Finance/* sub-labels for specifics.",
+  "Finance/Bills": "Utility bills, phone, broadband, rent, and other recurring service bills.",
+  "Finance/Statements": "Bank statements, credit card statements, and account summaries.",
+  "Finance/Payslips": "Salary slips and payslips from an employer.",
+  "Security/Alerts": "Security, login, or identity-verification alerts (new sign-in, verification codes, account activity).",
+  "Subscriptions": "Newsletters and service update emails from things you're subscribed to that don't need active review.",
+  "News": "News articles or newsletters from news outlets and journalists.",
+  "Junk": "Spam-adjacent or low-value unwanted emails that Gmail's own filter didn't catch.",
+  "Tickets": "Travel tickets (flights, trains, buses) and event tickets (concerts, shows, sports).",
+  "Job": "Work and job-related emails in general -- see Job/* sub-labels for specifics.",
+  "Job/Alerts": "Job listings, recruiter outreach, and job board digest emails.",
+  "Job/Applications": "Application confirmation emails and replies from employers or recruiters about a specific role you applied to."
+}
