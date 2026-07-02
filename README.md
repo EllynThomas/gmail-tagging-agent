@@ -125,6 +125,97 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 ---
 
+## Deploying to AWS EC2
+
+Running this on a server means the scripts execute on a schedule without your laptop being on.
+
+### 1. Launch an EC2 instance
+
+1. Go to [EC2 Console](https://console.aws.amazon.com/ec2/) → **Launch instance**.
+2. Choose **Ubuntu Server 24.04 LTS** (64-bit x86).
+3. Instance type: **t2.micro** (free tier, more than enough).
+4. **Key pair**: create a new one or use an existing one — download the `.pem` file and keep it safe.
+5. **Security group**: allow **SSH (port 22)** from your IP only. No other inbound ports needed.
+6. Launch the instance and note its **Public IPv4 address**.
+
+### 2. Connect and set up the server
+
+```bash
+# Fix key permissions (required by SSH)
+chmod 400 your-key.pem
+
+# Connect
+ssh -i your-key.pem ubuntu@<your-server-ip>
+```
+
+Once connected, install Python and clone the repo:
+
+```bash
+sudo apt update && sudo apt install -y python3-pip python3-venv git
+git clone https://github.com/EllynThomas/gmail-tagging-agent.git
+cd gmail-tagging-agent
+python3 -m venv .venv
+source .venv/bin/activate
+pip install google-auth google-auth-oauthlib google-auth-httplib2 \
+            google-api-python-client anthropic
+```
+
+### 3. Upload your credentials
+
+The OAuth browser flow can't run on a headless server, so complete it locally first (step 4 of Setup above) to generate `token.json`, then upload both files:
+
+```bash
+# Run this on your local machine, not the server
+scp -i your-key.pem credentials.json token.json ubuntu@<your-server-ip>:~/gmail-tagging-agent/
+```
+
+If you have a personal `labels.json`, upload that too:
+
+```bash
+scp -i your-key.pem labels.json ubuntu@<your-server-ip>:~/gmail-tagging-agent/
+```
+
+### 4. Set up cron on the server
+
+SSH back into the server and open the crontab:
+
+```bash
+crontab -e
+```
+
+Add the following (adjust the path if you cloned to a different location):
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Classify new inbox emails every day at 6am
+0 6 * * * cd /home/ubuntu/gmail-tagging-agent && /home/ubuntu/gmail-tagging-agent/.venv/bin/python classify_emails.py >> run.log 2>&1
+
+# Send weekly review email every Monday at 7am
+0 7 * * 1 cd /home/ubuntu/gmail-tagging-agent && /home/ubuntu/gmail-tagging-agent/.venv/bin/python weekly_review.py >> run.log 2>&1
+
+# Check for approved suggestions on Tuesday and Friday at 8am
+0 8 * * 2,5 cd /home/ubuntu/gmail-tagging-agent && /home/ubuntu/gmail-tagging-agent/.venv/bin/python apply_suggestions.py >> run.log 2>&1
+```
+
+### 5. Verify
+
+```bash
+cd ~/gmail-tagging-agent
+source .venv/bin/activate
+python test_suite.py
+```
+
+### Deploying future updates
+
+Once set up, pulling updates from GitHub is a one-liner:
+
+```bash
+ssh -i your-key.pem ubuntu@<your-server-ip> "cd ~/gmail-tagging-agent && git pull"
+```
+
+---
+
 ## Files
 
 | File | Committed | Notes |
